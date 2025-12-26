@@ -23,6 +23,7 @@ import platformUsersRoutes from './routes/platform-users';
 import adminUsersRoutes from './routes/admin-users';
 import adminBookingsRoutes from './routes/admin-bookings';
 import adminBookedPropertiesRoutes from './routes/admin-booked-properties';
+import adminLoginCheckRoutes from './routes/admin-login-check';
 
 // Load environment variables
 dotenv.config();
@@ -120,7 +121,8 @@ app.get('/', (req, res) => {
         platformUsers: '/api/platform-users',
         adminUsers: '/api/admin-users',
         adminBookings: '/api/admin-bookings',
-        adminBookedProperties: '/api/admin-booked-properties'
+        adminBookedProperties: '/api/admin-booked-properties',
+        adminLoginCheck: '/api/admin-login-check'
       }
     }
   });
@@ -152,6 +154,7 @@ app.use('/api/platform-users', platformUsersRoutes);
 app.use('/api/admin-users', adminUsersRoutes);
 app.use('/api/admin-bookings', adminBookingsRoutes);
 app.use('/api/admin-booked-properties', adminBookedPropertiesRoutes);
+app.use('/api/admin-login-check', adminLoginCheckRoutes);
 
 // Error handling middleware (must be last)
 app.use(notFound);
