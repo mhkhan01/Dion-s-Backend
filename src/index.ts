@@ -24,6 +24,8 @@ import adminUsersRoutes from './routes/admin-users';
 import adminBookingsRoutes from './routes/admin-bookings';
 import adminBookedPropertiesRoutes from './routes/admin-booked-properties';
 import adminLoginCheckRoutes from './routes/admin-login-check';
+import clientLoginCheckRoutes from './routes/client-login-check';
+import partnerLoginCheckRoutes from './routes/partner-login-check';
 
 // Load environment variables
 dotenv.config();
@@ -46,7 +48,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
   process.env.ADMIN_FRONTEND_URL || 'http://localhost:3002',
   'https://admin.booking-hub.co.uk',
-  'https://www.booking-hub.co.uk',
+  'https://app.booking-hub.co.uk',
   'https://booking-hub.co.uk',
   'http://localhost:3000',
   'http://localhost:3002'
@@ -122,7 +124,9 @@ app.get('/', (req, res) => {
         adminUsers: '/api/admin-users',
         adminBookings: '/api/admin-bookings',
         adminBookedProperties: '/api/admin-booked-properties',
-        adminLoginCheck: '/api/admin-login-check'
+        adminLoginCheck: '/api/admin-login-check',
+        clientLoginCheck: '/api/client-login-check',
+        partnerLoginCheck: '/api/partner-login-check'
       }
     }
   });
@@ -155,6 +159,8 @@ app.use('/api/admin-users', adminUsersRoutes);
 app.use('/api/admin-bookings', adminBookingsRoutes);
 app.use('/api/admin-booked-properties', adminBookedPropertiesRoutes);
 app.use('/api/admin-login-check', adminLoginCheckRoutes);
+app.use('/api/client-login-check', clientLoginCheckRoutes);
+app.use('/api/partner-login-check', partnerLoginCheckRoutes);
 
 // Error handling middleware (must be last)
 app.use(notFound);
