@@ -66,8 +66,8 @@ router.get('/', authenticateUser, requireAdmin, async (req: AuthenticatedRequest
   }
 });
 
-// GET /api/properties/stats - Get dashboard statistics
-router.get('/stats', async (req: Request, res: Response) => {
+// GET /api/properties/stats - Get dashboard statistics (admin only)
+router.get('/stats', authenticateUser, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     // Get total properties count
     const { count: totalProperties } = await supabase
@@ -112,6 +112,4 @@ router.get('/stats', async (req: Request, res: Response) => {
 });
 
 export default router;
-
-
 
