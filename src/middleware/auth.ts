@@ -30,40 +30,24 @@ export const authenticateUser = async (
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
-    // First, try to get user profile from 'profiles' table
+    // Get user profile with role
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('id', user.id)
-      .maybeSingle();
+      .single();
 
-    if (profile) {
-      req.user = {
-        id: user.id,
-        role: profile.role,
-        full_name: profile.full_name,
-      };
-      return next();
+    if (profileError || !profile) {
+      return res.status(401).json({ error: 'User profile not found' });
     }
 
-    // If not found in profiles, check the 'admin' table
-    const { data: adminProfile, error: adminError } = await supabaseAdmin
-      .from('admin')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle();
+    req.user = {
+      id: user.id,
+      role: profile.role,
+      full_name: profile.full_name,
+    };
 
-    if (adminProfile) {
-      req.user = {
-        id: user.id,
-        role: 'admin' as 'contractor' | 'landlord' | 'admin',
-        full_name: adminProfile.full_name,
-      };
-      return next();
-    }
-
-    // If not found in either table, return 401
-    return res.status(401).json({ error: 'User profile not found' });
+    return next();
   } catch (error) {
     console.error('Authentication error:', error);
     return res.status(500).json({ error: 'Internal server error during authentication' });
