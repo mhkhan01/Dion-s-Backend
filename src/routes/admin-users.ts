@@ -1,10 +1,11 @@
 import express from 'express';
 import { supabaseAdmin } from '../lib/supabase';
+import { authenticateUser, requireAdmin, AuthenticatedRequest } from '../middleware/auth';
 
 const router = express.Router();
 
 // GET /api/admin-users - Get all admin users (bypasses RLS)
-router.get('/', async (req, res) => {
+router.get('/', authenticateUser, requireAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     console.log('Fetching admin users via backend...');
 
