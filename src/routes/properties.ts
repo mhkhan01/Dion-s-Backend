@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../lib/supabase';
+import { authenticateUser, requireAdmin, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
-// GET /api/properties - Get all properties with landlord information
-router.get('/', async (req: Request, res: Response) => {
+// GET /api/properties - Get all properties with landlord information (admin only)
+router.get('/', authenticateUser, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     // Fetch all properties with landlord join (using service role - bypasses RLS)
     const { data: properties, error } = await supabase
