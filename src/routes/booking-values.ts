@@ -1,10 +1,11 @@
 import express from 'express';
 import { supabaseAdmin } from '../lib/supabase';
+import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 
 const router = express.Router();
 
-// GET /api/booking-values/:bookingDateId - Get booking value for a specific booking date
-router.get('/:bookingDateId', async (req, res) => {
+// GET /api/booking-values/:bookingDateId - Get booking value for a specific booking date (requires auth)
+router.get('/:bookingDateId', authenticateUser, async (req: AuthenticatedRequest, res) => {
   console.log('=== Fetch Booking Value API Called (Backend) ===');
   
   try {
