@@ -39,8 +39,8 @@ router.get('/', authenticateUser, requireAdmin, async (req: AuthenticatedRequest
   }
 });
 
-// PUT /api/admin-users/activate - Activate a user (bypasses RLS)
-router.put('/activate', async (req, res) => {
+// PUT /api/admin-users/activate - Activate a user (bypasses RLS, requires auth)
+router.put('/activate', authenticateUser, async (req: AuthenticatedRequest, res) => {
   try {
     const { userId, tableName } = req.body;
 
