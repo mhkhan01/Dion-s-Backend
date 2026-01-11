@@ -1,10 +1,11 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { supabase } from '../lib/supabase';
+import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
-// POST /api/property-assignment - Assign property to booking
-router.post('/', async (req: Request, res: Response) => {
+// POST /api/property-assignment - Assign property to booking (requires auth)
+router.post('/', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const {
       booking_date_id,
