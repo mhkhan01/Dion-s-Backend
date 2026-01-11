@@ -1,10 +1,11 @@
 import express from 'express';
 import { supabaseAdmin } from '../lib/supabase';
+import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 
 const router = express.Router();
 
-// GET /api/admin-bookings - Get all booking requests with related data (bypasses RLS)
-router.get('/', async (req, res) => {
+// GET /api/admin-bookings - Get all booking requests with related data (requires auth)
+router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
   try {
     console.log('Fetching booking requests via backend...');
 
