@@ -127,8 +127,8 @@ router.put('/deactivate', authenticateUser, async (req: AuthenticatedRequest, re
   }
 });
 
-// DELETE /api/admin-users/:tableName/:userId - Delete a user (bypasses RLS)
-router.delete('/:tableName/:userId', async (req, res) => {
+// DELETE /api/admin-users/:tableName/:userId - Delete a user (bypasses RLS, requires auth)
+router.delete('/:tableName/:userId', authenticateUser, async (req: AuthenticatedRequest, res) => {
   try {
     const { userId, tableName } = req.params;
 
