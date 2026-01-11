@@ -1,10 +1,11 @@
 import express from 'express';
 import { supabaseAdmin } from '../lib/supabase';
+import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 
 const router = express.Router();
 
-// GET /api/platform-users - Get all contractors and landlords (bypasses RLS)
-router.get('/', async (req, res) => {
+// GET /api/platform-users - Get all contractors and landlords (requires auth)
+router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
   try {
     console.log('Fetching platform users via backend...');
 
