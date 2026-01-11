@@ -83,8 +83,8 @@ router.put('/activate', authenticateUser, async (req: AuthenticatedRequest, res)
   }
 });
 
-// PUT /api/admin-users/deactivate - Deactivate a user (bypasses RLS)
-router.put('/deactivate', async (req, res) => {
+// PUT /api/admin-users/deactivate - Deactivate a user (bypasses RLS, requires auth)
+router.put('/deactivate', authenticateUser, async (req: AuthenticatedRequest, res) => {
   try {
     const { userId, tableName } = req.body;
 
@@ -172,12 +172,4 @@ router.delete('/:tableName/:userId', async (req, res) => {
 });
 
 export default router;
-
-
-
-
-
-
-
-
 
