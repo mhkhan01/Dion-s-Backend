@@ -5,6 +5,9 @@ import { supabaseAdmin } from '../lib/supabase';
 
 const router = express.Router();
 
+// Client terms version - update this when terms are updated
+const CLIENT_TERMS_VERSION = '2024-01-15-v1';
+
 // Validation schema for client (contractor) signup
 const clientSignupSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters'),
@@ -12,6 +15,9 @@ const clientSignupSchema = z.object({
   phone: z.string().min(10, 'Phone number must be at least 10 characters'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
+  termsAccepted: z.boolean().refine((val) => val === true, {
+    message: 'You must agree to the client terms and conditions',
+  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -137,6 +143,9 @@ router.post('/', async (req, res) => {
     console.log('Auth user created with ID:', userId);
     console.log('Confirmation email sent automatically by Supabase');
 
+    // Save checkbox agreement value to client_terms_accepted_ip column (text type)
+    const termsAgreementValue = validatedData.termsAccepted ? 'agreed' : 'not agreed';
+
     // Step 2: Create contractor profile in contractor table (EXACT SAME PATTERN AS FRONTEND)
     console.log('Creating contractor profile with data:', {
       id: userId,
@@ -144,6 +153,9 @@ router.post('/', async (req, res) => {
       full_name: validatedData.fullName,
       phone: validatedData.phone,
       role: 'contractor',
+      client_terms_accepted_at: new Date().toISOString(),
+      client_terms_version: CLIENT_TERMS_VERSION,
+      client_terms_accepted_ip: termsAgreementValue,
     });
 
     const { data: contractorData, error: profileError } = await supabaseAdmin
@@ -155,7 +167,10 @@ router.post('/', async (req, res) => {
         phone: validatedData.phone,
         role: 'contractor',
         is_active: true,
-        email_verified: false
+        email_verified: false,
+        client_terms_accepted_at: new Date().toISOString(),
+        client_terms_version: CLIENT_TERMS_VERSION,
+        client_terms_accepted_ip: termsAgreementValue,
       })
       .select()
       .single();
