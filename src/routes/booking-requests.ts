@@ -5,6 +5,9 @@ import { supabaseAdmin } from '../lib/supabase';
 
 const router = express.Router();
 
+// Client terms version - update this when terms are updated
+const CLIENT_TERMS_VERSION = '2024-01-15-v1';
+
 // Validation schema for booking request
 const bookingRequestSchema = z.object({
   fullName: z.string().min(1),
@@ -19,7 +22,10 @@ const bookingRequestSchema = z.object({
   })),
   teamSize: z.number().nullable().optional(),
   budgetPerPerson: z.string().optional(),
-  city: z.string().optional()
+  city: z.string().optional(),
+  termsAccepted: z.boolean().refine((val) => val === true, {
+    message: 'You must agree to the client terms and conditions',
+  }),
 });
 
 // POST /api/booking-requests - Create new booking request with contractor signup
@@ -96,6 +102,9 @@ router.post('/', async (req, res) => {
     const contractorCode = `CT-${nextNumber}`;
     console.log('Generated contractor code:', contractorCode);
 
+    // Save checkbox agreement value to client_terms_accepted_ip column (text type)
+    const termsAgreementValue = validatedData.termsAccepted ? 'agreed' : 'not agreed';
+
     // Step 3: Create contractor profile in contractor table
     const { data: contractorData, error: contractorError } = await supabaseAdmin
       .from('contractor')
@@ -109,7 +118,10 @@ router.post('/', async (req, res) => {
         code: contractorCode,
         role: 'contractor',
         is_active: true,
-        email_verified: false
+        email_verified: false,
+        client_terms_accepted_at: new Date().toISOString(),
+        client_terms_version: CLIENT_TERMS_VERSION,
+        client_terms_accepted_ip: termsAgreementValue,
       })
       .select()
       .single();
