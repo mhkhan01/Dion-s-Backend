@@ -5,6 +5,9 @@ import { supabaseAdmin } from '../lib/supabase';
 
 const router = express.Router();
 
+// Partner terms version - update this when terms are updated
+const PARTNER_TERMS_VERSION = '2024-01-15-v1';
+
 // Validation schema for partner (landlord) signup
 const partnerSignupSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters'),
@@ -13,6 +16,9 @@ const partnerSignupSchema = z.object({
   companyName: z.string().min(2, 'Company name must be at least 2 characters'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
+  termsAccepted: z.boolean().refine((val) => val === true, {
+    message: 'You must agree to the partner terms and conditions',
+  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -141,6 +147,9 @@ router.post('/', async (req, res) => {
     console.log('Auth user created with ID:', userId);
     console.log('Confirmation email sent automatically by Supabase');
 
+    // Save checkbox agreement value to partner_terms_accepted_ip column (text type)
+    const termsAgreementValue = validatedData.termsAccepted ? 'agreed' : 'not agreed';
+
     // Step 2: Create landlord profile in landlord table (EXACT SAME PATTERN AS FRONTEND)
     console.log('Creating landlord profile with data:', {
       id: userId,
@@ -149,6 +158,9 @@ router.post('/', async (req, res) => {
       phone: validatedData.phone,
       company_name: validatedData.companyName,
       role: 'landlord',
+      partner_terms_accepted_at: new Date().toISOString(),
+      partner_terms_version: PARTNER_TERMS_VERSION,
+      partner_terms_accepted_ip: termsAgreementValue,
     });
 
     const { data: landlordData, error: profileError } = await supabaseAdmin
@@ -158,10 +170,14 @@ router.post('/', async (req, res) => {
         email: normalizedEmail,
         full_name: validatedData.fullName,
         phone: validatedData.phone,
+        contact_number: validatedData.phone,
         company_name: validatedData.companyName,
         role: 'landlord',
         is_active: true,
-        email_verified: false
+        email_verified: false,
+        partner_terms_accepted_at: new Date().toISOString(),
+        partner_terms_version: PARTNER_TERMS_VERSION,
+        partner_terms_accepted_ip: termsAgreementValue,
       })
       .select()
       .single();
