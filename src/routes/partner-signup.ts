@@ -105,7 +105,7 @@ router.post('/', async (req, res) => {
       email: normalizedEmail,
       password: validatedData.password,
       options: {
-        emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/landlord`,
+        emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/partner`,
         data: {
           role: 'landlord',
           full_name: validatedData.fullName,
