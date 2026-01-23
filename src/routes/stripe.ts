@@ -40,8 +40,8 @@ router.post('/create-session', async (req, res) => {
     const session = await createCheckoutSession(
       booking.id,
       totalAmount,
-      `${process.env.FRONTEND_URL}/contractor?payment=success`,
-      `${process.env.FRONTEND_URL}/contractor?payment=cancelled`
+      `${process.env.FRONTEND_URL}/client?payment=success`,
+      `${process.env.FRONTEND_URL}/client?payment=cancelled`
     );
 
     // Create invoice record
