@@ -84,18 +84,20 @@ router.get('/stats', authenticateUser, requireAdmin, async (req: AuthenticatedRe
     const [
       { count: pendingBookingDates },
       { count: activeBookingsCount },
-      { count: confirmedBookingDates }
+      { count: confirmedBookingDates },
+      { count: bookedPropertiesCount }
     ] = await Promise.all([
       supabase.from('booking_dates').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('booked_properties').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-      supabase.from('booking_dates').select('*', { count: 'exact', head: true }).eq('status', 'confirmed')
+      supabase.from('booking_dates').select('*', { count: 'exact', head: true }).eq('status', 'confirmed'),
+      supabase.from('booked_properties').select('*', { count: 'exact', head: true })
     ]);
 
     return res.status(200).json({
       success: true,
       data: {
         totalProperties: totalProperties || 0,
-        bookedProperties: (totalProperties || 0) - (availableProperties || 0),
+        bookedProperties: bookedPropertiesCount || 0,
         activeBookings: activeBookingsCount || 0,
         pendingBookings: pendingBookingDates || 0,
         completeBookings: confirmedBookingDates || 0,
