@@ -46,7 +46,7 @@ router.post('/', async (req, res) => {
         success: true,
         exists: true,
         isActive: false,
-        message: 'Your account is inactive. Ask the admin to activate it.'
+        message: 'Your account is currently inactive, Ask the admin to activate your account'
       });
     }
 
