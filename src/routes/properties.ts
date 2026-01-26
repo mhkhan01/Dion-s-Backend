@@ -8,36 +8,54 @@ const router = Router();
 router.get('/', authenticateUser, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     // Fetch all properties with landlord join (using service role - bypasses RLS)
-    const { data: properties, error } = await supabase
-      .from('properties')
-      .select(`
-        *,
-        landlord:landlord_id (
-          id,
-          full_name,
-          email,
-          role,
-          company_name,
-          company_email,
-          company_address,
-          contact_number,
-          phone,
-          created_at,
-          updated_at
-        )
-      `)
-      .order('created_at', { ascending: false });
+    // Use pagination to fetch all properties (Supabase default limit is 1000)
+    const allProperties: any[] = [];
+    let from = 0;
+    const pageSize = 1000; // Supabase max limit per request
+    let hasMore = true;
 
-    if (error) {
-      console.error('Error fetching properties:', error);
-      return res.status(500).json({
-        error: 'Failed to fetch properties',
-        details: error.message
-      });
+    while (hasMore) {
+      const { data: properties, error } = await supabase
+        .from('properties')
+        .select(`
+          *,
+          landlord:landlord_id (
+            id,
+            full_name,
+            email,
+            role,
+            company_name,
+            company_email,
+            company_address,
+            contact_number,
+            phone,
+            created_at,
+            updated_at
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        console.error('Error fetching properties:', error);
+        return res.status(500).json({
+          error: 'Failed to fetch properties',
+          details: error.message
+        });
+      }
+
+      if (properties && properties.length > 0) {
+        allProperties.push(...properties);
+        from += pageSize;
+        // If we got fewer than pageSize, we've reached the end
+        hasMore = properties.length === pageSize;
+      } else {
+        hasMore = false;
+      }
     }
 
     // Map properties to include owner data
-    const propertiesWithOwners = (properties || []).map((property: any) => {
+    const propertiesWithOwners = (allProperties || []).map((property: any) => {
       return {
         ...property,
         owner: property.landlord || {
