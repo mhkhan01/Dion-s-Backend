@@ -13,6 +13,7 @@ const clientSignupSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
   phone: z.string().min(10, 'Phone number must be at least 10 characters'),
+  companyName: z.string().min(2, 'Company name must be at least 2 characters'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
   termsAccepted: z.boolean().refine((val) => val === true, {
@@ -33,7 +34,8 @@ router.post('/', async (req, res) => {
     console.log('Received client signup data:', {
       fullName: validatedData.fullName,
       email: validatedData.email,
-      phone: validatedData.phone
+      phone: validatedData.phone,
+      companyName: validatedData.companyName
     });
 
     // Step 0: Validate email doesn't exist in contractor or landlord tables (case-insensitive)
@@ -152,6 +154,7 @@ router.post('/', async (req, res) => {
       email: validatedData.email,
       full_name: validatedData.fullName,
       phone: validatedData.phone,
+      company_name: validatedData.companyName,
       role: 'contractor',
       client_terms_accepted_at: new Date().toISOString(),
       client_terms_version: CLIENT_TERMS_VERSION,
@@ -165,6 +168,7 @@ router.post('/', async (req, res) => {
         email: normalizedEmail,
         full_name: validatedData.fullName,
         phone: validatedData.phone,
+        company_name: validatedData.companyName,
         role: 'contractor',
         is_active: true,
         email_verified: false,
@@ -175,7 +179,8 @@ router.post('/', async (req, res) => {
       .select()
       .single();
 
-    console.log('Contractor profile insert result:', { profileError });
+    console.log('Contractor profile insert result:', { contractorData, profileError });
+    console.log('Company name being inserted:', validatedData.companyName);
 
     if (profileError) {
       console.error('Profile creation error:', profileError);
@@ -212,6 +217,7 @@ router.post('/', async (req, res) => {
           full_name: validatedData.fullName,
           email: normalizedEmail,
           phone: validatedData.phone,
+          company_name: validatedData.companyName,
           role: 'contractor',
           user_id: userId,
           is_active: true,
