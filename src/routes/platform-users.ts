@@ -35,11 +35,20 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       ...(landlords || []).map(user => ({ ...user, userType: 'Landlord', tableName: 'landlord' }))
     ];
 
+    // Enrich each user with email_verified from auth.users email_confirmed_at (timestamp = verified, null = pending)
+    const enrichedUsers = await Promise.all(
+      allUsers.map(async (user) => {
+        const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.admin.getUserById(user.id);
+        const emailVerified = !authError && authUser?.email_confirmed_at != null;
+        return { ...user, email_verified: emailVerified };
+      })
+    );
+
     console.log(`Successfully fetched ${contractors?.length || 0} contractors and ${landlords?.length || 0} landlords`);
 
     return res.status(200).json({
       success: true,
-      users: allUsers,
+      users: enrichedUsers,
       counts: {
         contractors: contractors?.length || 0,
         landlords: landlords?.length || 0,
@@ -57,6 +66,7 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
 });
 
 export default router;
+
 
 
 
