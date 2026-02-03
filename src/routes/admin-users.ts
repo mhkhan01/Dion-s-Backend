@@ -128,6 +128,8 @@ router.put('/deactivate', authenticateUser, async (req: AuthenticatedRequest, re
 });
 
 // DELETE /api/admin-users/:tableName/:userId - Delete a user (bypasses RLS, requires auth)
+// Removes from auth.users first (same Auth Admin API used for getUserById/email status), then role table and verified_users.
+// Auth user must be deleted first; deleting role/verified_users first can trigger cascades that remove the auth user, causing deleteUser to fail.
 router.delete('/:tableName/:userId', authenticateUser, async (req: AuthenticatedRequest, res) => {
   try {
     const { userId, tableName } = req.params;
@@ -141,21 +143,41 @@ router.delete('/:tableName/:userId', authenticateUser, async (req: Authenticated
 
     console.log('Deleting user:', { userId, tableName });
 
-    const { error } = await supabaseAdmin
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+
+    if (authError) {
+      console.error('Error deleting user from auth:', authError.message, authError.status, authError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to delete user from authentication',
+        details: authError.message
+      });
+    }
+
+    const { error: tableError } = await supabaseAdmin
       .from(tableName)
       .delete()
       .eq('id', userId);
 
-    if (error) {
-      console.error('Error deleting user:', error);
+    if (tableError) {
+      console.error('Error deleting user from role table:', tableError);
       return res.status(500).json({
         success: false,
         error: 'Failed to delete user',
-        details: error.message
+        details: tableError.message
       });
     }
 
-    console.log('User deleted successfully');
+    const { error: verifiedUsersError } = await supabaseAdmin
+      .from('verified_users')
+      .delete()
+      .eq('id', userId);
+
+    if (verifiedUsersError) {
+      console.error('Error deleting from verified_users (continuing):', verifiedUsersError.message);
+    }
+
+    console.log('User deleted successfully (auth.users, role table, verified_users)');
 
     return res.status(200).json({
       success: true,
