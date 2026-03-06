@@ -168,16 +168,26 @@ router.delete('/:tableName/:userId', authenticateUser, async (req: Authenticated
       });
     }
 
-    const { error: verifiedUsersError } = await supabaseAdmin
+    const { data: verifiedUserRow } = await supabaseAdmin
       .from('verified_users')
-      .delete()
-      .eq('id', userId);
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
 
-    if (verifiedUsersError) {
-      console.error('Error deleting from verified_users (continuing):', verifiedUsersError.message);
+    if (verifiedUserRow) {
+      const { error: verifiedUsersError } = await supabaseAdmin
+        .from('verified_users')
+        .delete()
+        .eq('id', userId);
+
+      if (verifiedUsersError) {
+        console.error('Error deleting from verified_users (continuing):', verifiedUsersError.message);
+      }
+    } else {
+      console.log('User not found in verified_users (unverified user), skipping verified_users deletion.');
     }
 
-    console.log('User deleted successfully (auth.users, role table, verified_users)');
+    console.log('User deleted successfully (auth.users, role table' + (verifiedUserRow ? ', verified_users' : '') + ')');
 
     return res.status(200).json({
       success: true,
