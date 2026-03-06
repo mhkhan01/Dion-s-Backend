@@ -33,17 +33,18 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-app.use(cors({
-  origin: '*',
-  credentials: true
-}));
+
 // Trust proxy - MUST be set before rate limiter
 // This is required when behind AWS Load Balancer/Nginx
 app.set('trust proxy', true);
-//checking push
+
 // Security middleware
 app.use(helmet());
-// Dynamic CORS configuration to support multiple environments
+
+// Dynamic CORS — a single, correct configuration.
+// Note: origin:'*' combined with credentials:true is invalid per the CORS spec
+// and is rejected by all modern browsers (Chrome, Safari, Firefox). Use an
+// explicit allowlist instead, which is what the block below does.
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
   process.env.ADMIN_FRONTEND_URL || 'http://localhost:3002',

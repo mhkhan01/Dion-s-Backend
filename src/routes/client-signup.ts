@@ -101,11 +101,16 @@ router.post('/', async (req, res) => {
     // This automatically sends confirmation emails
     // Use normalized email for consistency
     console.log('Starting Supabase Auth signup...');
+    const frontendUrl =
+      process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes('localhost')
+        ? process.env.FRONTEND_URL
+        : 'https://app.booking-hub.co.uk';
+
     const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
       email: normalizedEmail,
       password: validatedData.password,
       options: {
-        emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client`,
+        emailRedirectTo: `${frontendUrl}/client`,
         data: {
           role: 'contractor',
           full_name: validatedData.fullName
