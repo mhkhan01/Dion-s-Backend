@@ -47,6 +47,51 @@ router.post('/', async (req, res) => {
       city: validatedData.city
     });
 
+    // Step 0: Validate email doesn't exist in contractor or landlord tables (case-insensitive)
+    const normalizedEmail = validatedData.email.toLowerCase().trim();
+
+    // Check contractor table
+    const { data: existingContractor, error: contractorCheckError } = await supabaseAdmin
+      .from('contractor')
+      .select('id')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+
+    if (contractorCheckError) {
+      console.error('Error checking contractor table:', contractorCheckError);
+      return res.status(400).json({
+        error: 'This email is already in use, Try a different email.'
+      });
+    }
+
+    if (existingContractor) {
+      console.log('Email already exists in contractor table:', normalizedEmail);
+      return res.status(400).json({
+        error: 'This email is already in use, Try a different email.'
+      });
+    }
+
+    // Check landlord table
+    const { data: existingLandlord, error: landlordCheckError } = await supabaseAdmin
+      .from('landlord')
+      .select('id')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+
+    if (landlordCheckError) {
+      console.error('Error checking landlord table:', landlordCheckError);
+      return res.status(400).json({
+        error: 'This email is already in use, Try a different email.'
+      });
+    }
+
+    if (existingLandlord) {
+      console.log('Email already exists in landlord table:', normalizedEmail);
+      return res.status(400).json({
+        error: 'This email is already in use, Try a different email.'
+      });
+    }
+
     // Step 1: Create Supabase Auth account using regular signup
     // This automatically sends confirmation emails
     const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
