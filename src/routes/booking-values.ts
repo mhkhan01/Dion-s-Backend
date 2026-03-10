@@ -1,16 +1,14 @@
 import express from 'express';
 import { supabaseAdmin } from '../lib/supabase';
-import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
+import { getUserIdFromBearerToken } from '../lib/verifySupabaseToken';
 
 const router = express.Router();
 
-// GET /api/booking-values/:bookingDateId - Get booking value for a specific booking date (requires auth)
-router.get('/:bookingDateId', authenticateUser, async (req: AuthenticatedRequest, res) => {
-  console.log('=== Fetch Booking Value API Called (Backend) ===');
-  
+// GET /api/booking-values/:bookingDateId - Get value from booked_properties for this booking date.
+// Caller must be the contractor who owns the booking request (JWT user_id matches booking_request.user_id).
+router.get('/:bookingDateId', async (req, res) => {
   try {
-    const { bookingDateId } = req.params;
-    
+    const bookingDateId = req.params.bookingDateId;
     if (!bookingDateId) {
       return res.status(400).json({
         success: false,
@@ -18,10 +16,57 @@ router.get('/:bookingDateId', authenticateUser, async (req: AuthenticatedRequest
       });
     }
 
-    console.log('Fetching booking value for booking_id:', bookingDateId);
+    const userId = await getUserIdFromBearerToken(req);
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Missing or invalid authorization header'
+      });
+    }
 
-    // Fetch value from booked_properties table using service role (bypasses RLS)
-    // Use maybeSingle() instead of single() to handle cases where no record exists
+    const { data: bookingDate, error: dateError } = await supabaseAdmin
+      .from('booking_dates')
+      .select('booking_request_id')
+      .eq('id', bookingDateId)
+      .maybeSingle();
+
+    if (dateError || !bookingDate?.booking_request_id) {
+      return res.status(404).json({
+        success: false,
+        error: 'Booking date not found'
+      });
+    }
+
+    const { data: bookingRequest, error: reqError } = await supabaseAdmin
+      .from('booking_requests')
+      .select('user_id, email')
+      .eq('id', bookingDate.booking_request_id)
+      .maybeSingle();
+
+    if (reqError || !bookingRequest) {
+      return res.status(404).json({
+        success: false,
+        error: 'Booking request not found'
+      });
+    }
+
+    const allowedByUserId = bookingRequest.user_id === userId;
+    let allowedByEmail = false;
+    if (!allowedByUserId && bookingRequest.email) {
+      const { data: contractor } = await supabaseAdmin
+        .from('contractor')
+        .select('email')
+        .eq('id', userId)
+        .maybeSingle();
+      allowedByEmail = contractor?.email != null && contractor.email === bookingRequest.email;
+    }
+    if (!allowedByUserId && !allowedByEmail) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    }
+
     const { data: bookedProperty, error: bookedPropertyError } = await supabaseAdmin
       .from('booked_properties')
       .select('value')
@@ -30,47 +75,30 @@ router.get('/:bookingDateId', authenticateUser, async (req: AuthenticatedRequest
 
     if (bookedPropertyError) {
       console.error('Error fetching booking value:', bookedPropertyError);
-      console.error('Error details:', {
-        message: bookedPropertyError.message,
-        details: bookedPropertyError.details,
-        hint: bookedPropertyError.hint,
-        code: bookedPropertyError.code
-      });
-      
       return res.status(500).json({
         success: false,
-        error: `Failed to fetch booking value: ${bookedPropertyError.message}`,
-        details: bookedPropertyError.details
+        error: 'Failed to fetch booking value'
       });
     }
 
-    // If no record found, return null
     if (!bookedProperty) {
-      console.log('No booked_property record found for booking_id:', bookingDateId);
       return res.status(200).json({
         success: true,
         value: null
       });
     }
 
-    console.log('Booking value fetched successfully:', bookedProperty.value);
-
-    // Return the value
     return res.status(200).json({
       success: true,
-      value: bookedProperty.value || null
+      value: bookedProperty.value ?? null
     });
-
   } catch (error) {
-    console.error('=== Error fetching booking value ===');
-    console.error('Error details:', error);
-    
+    console.error('Error fetching booking value:', error);
     return res.status(500).json({
       success: false,
-      error: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      error: 'Failed to fetch booking value'
     });
   }
 });
 
 export default router;
-
