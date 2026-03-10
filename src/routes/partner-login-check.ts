@@ -1,24 +1,33 @@
 import express from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../lib/supabase';
+import { getUserIdFromBearerToken } from '../lib/verifySupabaseToken';
 
 const router = express.Router();
 
-// Validation schema for partner login check
+// Validation schema for partner login check (body optional when Authorization is used)
 const partnerLoginCheckSchema = z.object({
-  userId: z.string().uuid('Please provide a valid user ID'),
+  userId: z.string().uuid('Please provide a valid user ID').optional(),
 });
 
-// POST /api/partner-login-check - Check if landlord is active
+// POST /api/partner-login-check - Check if landlord is active (requires Authorization: Bearer <token>)
 router.post('/', async (req, res) => {
   try {
-    const validatedData = partnerLoginCheckSchema.parse(req.body);
-    
-    // Check if landlord exists and is active
+    const userId = await getUserIdFromBearerToken(req);
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Missing or invalid authorization header',
+      });
+    }
+
+    partnerLoginCheckSchema.safeParse(req.body);
+
+    // Check if landlord exists and is active (use userId from verified token)
     const { data: landlordData, error: landlordError } = await supabaseAdmin
       .from('landlord')
       .select('id, email, is_active')
-      .eq('id', validatedData.userId)
+      .eq('id', userId)
       .maybeSingle();
 
     if (landlordError) {

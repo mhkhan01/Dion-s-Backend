@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { supabaseAdmin } from '../lib/supabase';
 
 export interface AuthenticatedRequest extends Request {
@@ -9,6 +10,41 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
+/** Resolve req.user from userId (after JWT is verified). Shared by both verification paths. */
+async function setUserFromId(req: AuthenticatedRequest, userId: string): Promise<boolean> {
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (profile) {
+    req.user = {
+      id: userId,
+      role: profile.role,
+      full_name: profile.full_name,
+    };
+    return true;
+  }
+
+  const { data: adminProfile, error: adminError } = await supabaseAdmin
+    .from('admin')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (adminProfile) {
+    req.user = {
+      id: userId,
+      role: 'admin' as 'contractor' | 'landlord' | 'admin',
+      full_name: adminProfile.full_name,
+    };
+    return true;
+  }
+
+  return false;
+}
+
 export const authenticateUser = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -16,54 +52,48 @@ export const authenticateUser = async (
 ) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Missing or invalid authorization header' });
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    const jwtSecret = process.env.SUPABASE_JWT_SECRET;
 
-    // Verify the JWT token with Supabase
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    let userId: string;
 
-    if (authError || !user) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
+    if (jwtSecret) {
+      // Verify JWT locally using the Supabase legacy JWT secret (recommended for production)
+      try {
+        const decoded = jwt.verify(token, jwtSecret) as jwt.JwtPayload;
+        const sub = decoded.sub;
+        if (!sub || typeof sub !== 'string') {
+          return res.status(401).json({ error: 'Invalid or expired token' });
+        }
+        userId = sub;
+      } catch (err) {
+        if (err instanceof jwt.TokenExpiredError) {
+          return res.status(401).json({ error: 'Invalid or expired token' });
+        }
+        if (err instanceof jwt.JsonWebTokenError) {
+          return res.status(401).json({ error: 'Invalid or expired token' });
+        }
+        throw err;
+      }
+    } else {
+      // Fallback: verify via Supabase API when SUPABASE_JWT_SECRET is not set
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      if (authError || !user) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+      }
+      userId = user.id;
     }
 
-    // First, try to get user profile from 'profiles' table
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (profile) {
-      req.user = {
-        id: user.id,
-        role: profile.role,
-        full_name: profile.full_name,
-      };
-      return next();
+    const found = await setUserFromId(req, userId);
+    if (!found) {
+      return res.status(401).json({ error: 'User profile not found' });
     }
-
-    // If not found in profiles, check the 'admin' table
-    const { data: adminProfile, error: adminError } = await supabaseAdmin
-      .from('admin')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (adminProfile) {
-      req.user = {
-        id: user.id,
-        role: 'admin' as 'contractor' | 'landlord' | 'admin',
-        full_name: adminProfile.full_name,
-      };
-      return next();
-    }
-
-    // If not found in either table, return 401
-    return res.status(401).json({ error: 'User profile not found' });
+    return next();
   } catch (error) {
     console.error('Authentication error:', error);
     return res.status(500).json({ error: 'Internal server error during authentication' });

@@ -1,24 +1,33 @@
 import express from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../lib/supabase';
+import { getUserIdFromBearerToken } from '../lib/verifySupabaseToken';
 
 const router = express.Router();
 
-// Validation schema for client login check
+// Validation schema for client login check (body optional when Authorization is used)
 const clientLoginCheckSchema = z.object({
-  userId: z.string().uuid('Please provide a valid user ID'),
+  userId: z.string().uuid('Please provide a valid user ID').optional(),
 });
 
-// POST /api/client-login-check - Check if contractor is active
+// POST /api/client-login-check - Check if contractor is active (requires Authorization: Bearer <token>)
 router.post('/', async (req, res) => {
   try {
-    const validatedData = clientLoginCheckSchema.parse(req.body);
-    
-    // Check if contractor exists and is active
+    const userId = await getUserIdFromBearerToken(req);
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Missing or invalid authorization header',
+      });
+    }
+
+    clientLoginCheckSchema.safeParse(req.body);
+
+    // Check if contractor exists and is active (use userId from verified token)
     const { data: contractorData, error: contractorError } = await supabaseAdmin
       .from('contractor')
       .select('id, email, is_active')
-      .eq('id', validatedData.userId)
+      .eq('id', userId)
       .maybeSingle();
 
     if (contractorError) {
