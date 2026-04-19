@@ -4,12 +4,17 @@ import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 
 const router = express.Router();
 
-// GET /api/admin-booked-properties - Get all booked properties with related data (requires auth)
+// GET /api/admin-booked-properties - Get paginated booked properties with related data (requires auth)
+// Query params: page (default 1), limit (default 20, max 100)
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
   try {
     console.log('Fetching booked properties via backend...');
 
-    const { data, error } = await supabaseAdmin
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(Math.max(1, parseInt(req.query.limit as string) || 20), 100);
+    const offset = (page - 1) * limit;
+
+    const { data, error, count } = await supabaseAdmin
       .from('booked_properties')
       .select(`
         *,
@@ -41,8 +46,9 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
           phone,
           city
         )
-      `)
-      .order('created_at', { ascending: false });
+      `, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       console.error('Error fetching booked properties:', error);
@@ -54,11 +60,18 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       });
     }
 
-    console.log(`Successfully fetched ${data?.length || 0} booked properties`);
+    const total = count ?? 0;
+    console.log(`Successfully fetched ${data?.length || 0} booked properties (page ${page} of ${Math.ceil(total / limit)})`);
 
     return res.status(200).json({
       success: true,
-      bookedProperties: data || []
+      bookedProperties: data || [],
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
     });
   } catch (error) {
     console.error('Error fetching booked properties:', error);

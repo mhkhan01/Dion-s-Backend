@@ -4,16 +4,22 @@ import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 
 const router = express.Router();
 
-// GET /api/admin-bookings - Get all booking requests with related data (requires auth)
+// GET /api/admin-bookings - Get paginated booking requests with related data (requires auth)
+// Query params: page (default 1), limit (default 20, max 100)
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
   try {
     console.log('Fetching booking requests via backend...');
 
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(Math.max(1, parseInt(req.query.limit as string) || 20), 100);
+    const offset = (page - 1) * limit;
+
     let bookingRequests = [];
+    let total = 0;
 
     try {
       // Try booking_requests table with booking_dates, assigned properties, and contractor info
-      const { data, error: bookingError } = await supabaseAdmin
+      const { data, error: bookingError, count } = await supabaseAdmin
         .from('booking_requests')
         .select(`
           *,
@@ -36,27 +42,31 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
               property_address
             )
           )
-        `)
-        .order('created_at', { ascending: false });
-      
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
       if (!bookingError && data) {
         bookingRequests = data;
+        total = count ?? 0;
       } else {
         throw bookingError;
       }
     } catch (error) {
       console.log('booking_requests table failed, trying bookings table...', error);
-      
+
       // Try bookings table from the original schema
-      const { data, error: bookingsError } = await supabaseAdmin
+      const { data, error: bookingsError, count } = await supabaseAdmin
         .from('bookings')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
       if (bookingsError) {
         throw bookingsError;
       }
       bookingRequests = data || [];
+      total = count ?? 0;
     }
 
     // Process booking requests to create separate entries for each date range
@@ -134,11 +144,17 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       }
     }
 
-    console.log(`Successfully fetched ${expandedBookings.length} bookings`);
+    console.log(`Successfully fetched ${expandedBookings.length} bookings (page ${page} of ${Math.ceil(total / limit)})`);
 
     return res.status(200).json({
       success: true,
-      bookings: expandedBookings
+      bookings: expandedBookings,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
     });
   } catch (error) {
     console.error('Error fetching booking requests:', error);

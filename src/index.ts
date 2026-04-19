@@ -27,6 +27,7 @@ import adminLoginCheckRoutes from './routes/admin-login-check';
 import clientLoginCheckRoutes from './routes/client-login-check';
 import partnerLoginCheckRoutes from './routes/partner-login-check';
 import partnerBookedPropertiesRoutes from './routes/partner-booked-properties';
+import partnerPropertiesRoutes from './routes/partner-properties';
 
 // Load environment variables
 dotenv.config();
@@ -165,6 +166,7 @@ app.use('/api/admin-login-check', adminLoginCheckRoutes);
 app.use('/api/client-login-check', clientLoginCheckRoutes);
 app.use('/api/partner-login-check', partnerLoginCheckRoutes);
 app.use('/api/partner-booked-properties', partnerBookedPropertiesRoutes);
+app.use('/api/partner-properties', partnerPropertiesRoutes);
 
 // Error handling middleware (must be last)
 app.use(notFound);

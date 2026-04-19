@@ -35,14 +35,27 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
       ...(landlords || []).map(user => ({ ...user, userType: 'Landlord', tableName: 'landlord' }))
     ];
 
-    // Enrich each user with email_verified from auth.users email_confirmed_at (timestamp = verified, null = pending)
-    const enrichedUsers = await Promise.all(
-      allUsers.map(async (user) => {
-        const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.admin.getUserById(user.id);
-        const emailVerified = !authError && authUser?.email_confirmed_at != null;
-        return { ...user, email_verified: emailVerified };
-      })
-    );
+    // Batch-fetch all auth users once to avoid N+1 getUserById calls
+    const authUserMap = new Map<string, boolean>();
+    let authPage = 1;
+    let hasMoreAuthUsers = true;
+    while (hasMoreAuthUsers) {
+      const { data: { users: pageUsers }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        page: authPage,
+        perPage: 1000
+      });
+      if (listError || !pageUsers || pageUsers.length === 0) break;
+      for (const authUser of pageUsers) {
+        authUserMap.set(authUser.id, authUser.email_confirmed_at != null);
+      }
+      hasMoreAuthUsers = pageUsers.length === 1000;
+      authPage++;
+    }
+
+    const enrichedUsers = allUsers.map(user => ({
+      ...user,
+      email_verified: authUserMap.get(user.id) ?? false
+    }));
 
     console.log(`Successfully fetched ${contractors?.length || 0} contractors and ${landlords?.length || 0} landlords`);
 

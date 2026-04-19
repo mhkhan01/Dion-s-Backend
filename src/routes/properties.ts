@@ -4,75 +4,67 @@ import { authenticateUser, requireAdmin, AuthenticatedRequest } from '../middlew
 
 const router = Router();
 
-// GET /api/properties - Get all properties with landlord information (admin only)
+// GET /api/properties - Get paginated properties with landlord information (admin only)
+// Query params: page (default 1), limit (default 20, max 100)
 router.get('/', authenticateUser, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    // Fetch all properties with landlord join (using service role - bypasses RLS)
-    // Use pagination to fetch all properties (Supabase default limit is 1000)
-    const allProperties: any[] = [];
-    let from = 0;
-    const pageSize = 1000; // Supabase max limit per request
-    let hasMore = true;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(Math.max(1, parseInt(req.query.limit as string) || 20), 100);
+    const offset = (page - 1) * limit;
 
-    while (hasMore) {
-      const { data: properties, error } = await supabase
-        .from('properties')
-        .select(`
-          *,
-          landlord:landlord_id (
-            id,
-            full_name,
-            email,
-            role,
-            company_name,
-            company_email,
-            company_address,
-            contact_number,
-            phone,
-            created_at,
-            updated_at
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .range(from, from + pageSize - 1);
+    const { data: properties, error, count } = await supabase
+      .from('properties')
+      .select(`
+        *,
+        landlord:landlord_id (
+          id,
+          full_name,
+          email,
+          role,
+          company_name,
+          company_email,
+          company_address,
+          contact_number,
+          phone,
+          created_at,
+          updated_at
+        )
+      `, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
-      if (error) {
-        console.error('Error fetching properties:', error);
-        return res.status(500).json({
-          error: 'Failed to fetch properties',
-          details: error.message
-        });
-      }
-
-      if (properties && properties.length > 0) {
-        allProperties.push(...properties);
-        from += pageSize;
-        // If we got fewer than pageSize, we've reached the end
-        hasMore = properties.length === pageSize;
-      } else {
-        hasMore = false;
-      }
+    if (error) {
+      console.error('Error fetching properties:', error);
+      return res.status(500).json({
+        error: 'Failed to fetch properties',
+        details: error.message
+      });
     }
 
-    // Map properties to include owner data
-    const propertiesWithOwners = (allProperties || []).map((property: any) => {
-      return {
-        ...property,
-        owner: property.landlord || {
-          id: property.landlord_id || 'unknown',
-          full_name: 'Property Owner',
-          email: 'owner@example.com',
-          role: 'landlord',
-          created_at: property.created_at || new Date().toISOString(),
-          updated_at: property.updated_at || new Date().toISOString()
-        }
-      };
-    });
+    const propertiesWithOwners = (properties || []).map((property: any) => ({
+      ...property,
+      owner: property.landlord || {
+        id: property.landlord_id || 'unknown',
+        full_name: 'Property Owner',
+        email: 'owner@example.com',
+        role: 'landlord',
+        created_at: property.created_at || new Date().toISOString(),
+        updated_at: property.updated_at || new Date().toISOString()
+      }
+    }));
+
+    const total = count ?? 0;
 
     return res.status(200).json({
       success: true,
       data: propertiesWithOwners,
-      count: propertiesWithOwners.length
+      count: propertiesWithOwners.length,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
     });
 
   } catch (error) {
