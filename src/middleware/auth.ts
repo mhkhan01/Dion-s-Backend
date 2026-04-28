@@ -58,30 +58,23 @@ export const authenticateUser = async (
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+    const jwtSecret = process.env.SUPABASE_JWT_SECRET?.trim();
 
-    let userId: string;
+    let userId: string | undefined;
 
     if (jwtSecret) {
-      // Verify JWT locally using the Supabase legacy JWT secret (recommended for production)
       try {
         const decoded = jwt.verify(token, jwtSecret) as jwt.JwtPayload;
         const sub = decoded.sub;
-        if (!sub || typeof sub !== 'string') {
-          return res.status(401).json({ error: 'Invalid or expired token' });
+        if (sub && typeof sub === 'string') {
+          userId = sub;
         }
-        userId = sub;
-      } catch (err) {
-        if (err instanceof jwt.TokenExpiredError) {
-          return res.status(401).json({ error: 'Invalid or expired token' });
-        }
-        if (err instanceof jwt.JsonWebTokenError) {
-          return res.status(401).json({ error: 'Invalid or expired token' });
-        }
-        throw err;
+      } catch {
+        // Wrong/rotated secret or bad token: verify with Supabase (authoritative).
       }
-    } else {
-      // Fallback: verify via Supabase API when SUPABASE_JWT_SECRET is not set
+    }
+
+    if (!userId) {
       const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
       if (authError || !user) {
         return res.status(401).json({ error: 'Invalid or expired token' });

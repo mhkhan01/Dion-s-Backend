@@ -19,18 +19,20 @@ export async function getUserIdFromBearerToken(req: Request): Promise<string | n
     return null;
   }
 
-  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET?.trim();
 
+  // Prefer local verify when the secret matches Supabase (fast, no network).
+  // If SUPABASE_JWT_SECRET is wrong, a placeholder, or rotated, jwt.verify fails;
+  // fall through to Supabase Auth so login-check still works (same as when secret is unset).
   if (jwtSecret) {
     try {
       const decoded = jwt.verify(token, jwtSecret) as jwt.JwtPayload;
       const sub = decoded.sub;
-      if (!sub || typeof sub !== 'string') {
-        return null;
+      if (sub && typeof sub === 'string') {
+        return sub;
       }
-      return sub;
     } catch {
-      return null;
+      // continue to getUser
     }
   }
 
